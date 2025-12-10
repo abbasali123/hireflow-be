@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { register, login } from './controllers/authController';
 import { authMiddleware } from './middleware/authMiddleware';
 import {
@@ -12,8 +11,7 @@ import {
 import jobRoutes from './routes/jobRoutes';
 import candidateRoutes from './routes/candidateRoutes';
 import jobCandidateRoutes from './routes/jobCandidateRoutes';
-
-dotenv.config();
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 
@@ -39,5 +37,7 @@ app.post('/ai/generate-summary', authMiddleware, generateSummaryController);
 app.use('/jobs', jobRoutes);
 app.use('/jobs', jobCandidateRoutes);
 app.use('/candidates', candidateRoutes);
+
+app.use(errorHandler);
 
 export default app;
