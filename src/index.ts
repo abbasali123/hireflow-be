@@ -4,6 +4,12 @@ import dotenv from 'dotenv';
 import { register, login } from './controllers/authController';
 import { authMiddleware } from './middleware/authMiddleware';
 import { uploadCandidate } from './controllers/candidateController';
+import {
+  generateJobDescriptionController,
+  scoreCandidateController,
+  generateOutreachController,
+  generateSummaryController,
+} from './controllers/aiController';
 import { upload } from './middleware/uploadMiddleware';
 
 dotenv.config();
@@ -26,6 +32,10 @@ app.get('/protected', authMiddleware, (req: Request, res: Response) => {
 });
 
 app.post('/candidates/upload', authMiddleware, upload.single('resume'), uploadCandidate);
+app.post('/ai/generate-jd', authMiddleware, generateJobDescriptionController);
+app.post('/ai/score-candidate', authMiddleware, scoreCandidateController);
+app.post('/ai/generate-outreach', authMiddleware, generateOutreachController);
+app.post('/ai/generate-summary', authMiddleware, generateSummaryController);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
