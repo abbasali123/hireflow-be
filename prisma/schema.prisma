@@ -1,0 +1,69 @@
+// Prisma schema for HireFlow AI
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  passwordHash String
+  name         String
+  companyName  String?
+  createdAt    DateTime    @default(now())
+  jobs         Job[]
+  candidates   Candidate[]
+}
+
+model Job {
+  id               String         @id @default(cuid())
+  userId           String
+  title            String
+  company          String
+  location         String
+  seniority        String
+  salaryMin        Int?
+  salaryMax        Int?
+  description      String
+  requiredSkills   Json
+  niceToHaveSkills Json
+  createdAt        DateTime       @default(now())
+  user             User           @relation(fields: [userId], references: [id])
+  jobCandidates    JobCandidate[]
+}
+
+model Candidate {
+  id            String         @id @default(cuid())
+  userId        String
+  fullName      String
+  email         String?
+  phone         String?
+  location      String?
+  resumeUrl     String?
+  summary       String?
+  rawText       String?
+  skills        Json
+  experience    Json
+  education     Json
+  createdAt     DateTime       @default(now())
+  user          User           @relation(fields: [userId], references: [id])
+  jobCandidates JobCandidate[]
+}
+
+model JobCandidate {
+  id          String    @id @default(cuid())
+  jobId       String
+  candidateId String
+  status      String
+  matchScore  Int?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  job         Job       @relation(fields: [jobId], references: [id])
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+}
