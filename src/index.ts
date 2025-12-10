@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { register, login } from './controllers/authController';
 import { authMiddleware } from './middleware/authMiddleware';
+import { uploadCandidate } from './controllers/candidateController';
+import { upload } from './middleware/uploadMiddleware';
 
 dotenv.config();
 
@@ -22,6 +24,8 @@ app.get('/health', (_req: Request, res: Response) => {
 app.get('/protected', authMiddleware, (req: Request, res: Response) => {
   res.json({ message: 'Access granted', user: req.user });
 });
+
+app.post('/candidates/upload', authMiddleware, upload.single('resume'), uploadCandidate);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
