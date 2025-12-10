@@ -71,9 +71,27 @@ const extractSections = (rawText: string) => {
   return sections;
 };
 
-const extractWithTextract = async (filePath: string): Promise<string> => {
+const extractWithTextractFromPath = async (filePath: string, mimeType: string): Promise<string> => {
   return new Promise((resolve, reject) => {
-    textract.fromFileWithPath(filePath, { preserveLineBreaks: true }, (error, text) => {
+    textract.fromFileWithPath(
+      filePath,
+      { preserveLineBreaks: true, typeOverride: mimeType },
+      (error, text) => {
+        if (error) {
+          return reject(error);
+        }
+        resolve(text || '');
+      },
+    );
+  });
+};
+
+const extractWithTextractFromBuffer = async (
+  mimeType: string,
+  buffer: Buffer,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    textract.fromBufferWithMime(mimeType, buffer, { preserveLineBreaks: true }, (error, text) => {
       if (error) {
         return reject(error);
       }
@@ -83,15 +101,17 @@ const extractWithTextract = async (filePath: string): Promise<string> => {
 };
 
 const extractTextFromFile = async (
-  filePath: string,
-  mimeType: string,
-  originalName: string,
+  file: Express.Multer.File,
 ): Promise<string> => {
-  const ext = path.extname(originalName).toLowerCase();
+  const ext = path.extname(file.originalname).toLowerCase();
+  const mimeType = file.mimetype;
 
   if (mimeType === 'application/pdf' || ext === '.pdf') {
-    const fileBuffer = await fs.readFile(filePath);
-    const pdfData = await pdfParse(fileBuffer);
+    const buffer = file.buffer || (file.path ? await fs.readFile(file.path) : null);
+    if (!buffer) {
+      throw new Error('Unable to read PDF content for parsing');
+    }
+    const pdfData = await pdfParse(buffer);
     return pdfData.text || '';
   }
 
@@ -99,21 +119,41 @@ const extractTextFromFile = async (
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     ext === '.docx'
   ) {
-    const result = await mammoth.extractRawText({ path: filePath });
-    return result.value || '';
+    if (file.buffer) {
+      const result = await mammoth.extractRawText({ buffer: file.buffer });
+      return result.value || '';
+    }
+    if (file.path) {
+      const result = await mammoth.extractRawText({ path: file.path });
+      return result.value || '';
+    }
+    throw new Error('Unable to read DOCX content for parsing');
   }
 
   if (mimeType === 'application/msword' || ext === '.doc') {
-    return extractWithTextract(filePath);
+    if (file.buffer) {
+      return extractWithTextractFromBuffer(mimeType, file.buffer);
+    }
+    if (file.path) {
+      return extractWithTextractFromPath(file.path, mimeType);
+    }
+    throw new Error('Unable to read DOC content for parsing');
   }
 
-  return extractWithTextract(filePath);
+  if (file.buffer) {
+    return extractWithTextractFromBuffer(mimeType, file.buffer);
+  }
+  if (file.path) {
+    return extractWithTextractFromPath(file.path, mimeType);
+  }
+
+  throw new Error('Unsupported file input for resume parsing');
 };
 
 export const extractCandidateData = async (
   file: Express.Multer.File,
 ): Promise<CandidateExtraction> => {
-  const raw = await extractTextFromFile(file.path, file.mimetype, file.originalname);
+  const raw = await extractTextFromFile(file);
   const rawText = normalizeText(raw);
   const fullName = extractFullName(rawText);
   const sections = extractSections(rawText);

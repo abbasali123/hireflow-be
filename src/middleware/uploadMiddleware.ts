@@ -1,11 +1,9 @@
 import fs from 'fs';
-import path from 'path';
 import multer from 'multer';
+import { isS3Driver, storageConfig } from '../config/storageConfig';
 
-const uploadDir = path.join(__dirname, '..', '..', 'uploads');
-
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+if (!isS3Driver && !fs.existsSync(storageConfig.uploadDir)) {
+  fs.mkdirSync(storageConfig.uploadDir, { recursive: true });
 }
 
 const allowedMimeTypes = [
@@ -14,14 +12,16 @@ const allowedMimeTypes = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ];
 
-const storage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
+    cb(null, storageConfig.uploadDir);
   },
   filename: (_req, file, cb) => {
     cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
+
+const storage = isS3Driver ? multer.memoryStorage() : diskStorage;
 
 const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
   if (allowedMimeTypes.includes(file.mimetype)) {
