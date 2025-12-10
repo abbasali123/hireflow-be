@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
 import { Candidate, Job } from '@prisma/client';
+import { config } from '../config/env';
 
-const apiKey = process.env.OPENAI_API_KEY;
+const apiKey = config.openAiApiKey;
 
 if (!apiKey) {
   throw new Error('OPENAI_API_KEY is not set in the environment variables');

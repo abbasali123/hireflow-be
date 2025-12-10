@@ -1,12 +1,10 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
 import prisma from '../prismaClient';
+import { config } from '../config/env';
 
-dotenv.config();
-
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = config.jwtSecret;
 
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET is not set in the environment variables');
