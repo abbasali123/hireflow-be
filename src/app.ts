@@ -11,6 +11,7 @@ import {
 } from './controllers/aiController';
 import jobRoutes from './routes/jobRoutes';
 import candidateRoutes from './routes/candidateRoutes';
+import jobCandidateRoutes from './routes/jobCandidateRoutes';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.post('/ai/generate-outreach', authMiddleware, generateOutreachController);
 app.post('/ai/generate-summary', authMiddleware, generateSummaryController);
 
 app.use('/jobs', jobRoutes);
+app.use('/jobs', jobCandidateRoutes);
 app.use('/candidates', candidateRoutes);
 
 export default app;
