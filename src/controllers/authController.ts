@@ -84,3 +84,32 @@ export const login = async (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+export const getCurrentUser = async (req: Request, res: Response) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  if (!req.user?.id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { passwordHash: _, ...userWithoutPassword } = user;
+
+    return res.json({ user: userWithoutPassword, token });
+  } catch (error) {
+    console.error('Error fetching current user:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};

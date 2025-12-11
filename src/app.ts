@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { register, login } from './controllers/authController';
+import { getCurrentUser, login, register } from './controllers/authController';
 import { authMiddleware } from './middleware/authMiddleware';
 import {
   generateJobDescriptionController,
@@ -20,6 +20,7 @@ app.use(express.json());
 
 app.post('/auth/register', register);
 app.post('/auth/login', login);
+app.get('/auth/me', authMiddleware, getCurrentUser);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
