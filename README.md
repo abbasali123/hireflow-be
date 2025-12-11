@@ -1,10 +1,10 @@
 # HireFlow Backend
 
-Node.js + TypeScript API for HireFlow. The service uses Prisma with SQLite by default, supports local or S3 resume storage, and exposes authentication plus job/candidate management endpoints.
+Node.js + TypeScript API for HireFlow. The service uses Prisma with PostgreSQL, supports local or S3 resume storage, and exposes authentication plus job/candidate management endpoints.
 
 ## Prerequisites
 - Node.js 18+ and npm
-- SQLite (bundled with Prisma for local development)
+- PostgreSQL 14+ running locally or hosted
 - Optional: AWS credentials if you want to store resumes on S3
 
 ## Setup
@@ -13,14 +13,16 @@ Node.js + TypeScript API for HireFlow. The service uses Prisma with SQLite by de
    npm install
    ```
 
-2. **Create environment file** – copy the sample below into `.env` in the project root and adjust values as needed.
+2. **Prepare PostgreSQL** – create a database (e.g., `hireflow`) and user with permission to access it.
+
+3. **Create environment file** – copy the sample below into `.env` in the project root and adjust values as needed.
    ```env
    # App
    PORT=4000
    JWT_SECRET=changeme
    
-   # Database (SQLite by default)
-   DATABASE_URL="file:./dev.db"
+   # Database (PostgreSQL connection string)
+   DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/hireflow?schema=public"
    
    # AI
    OPENAI_API_KEY=
@@ -33,18 +35,18 @@ Node.js + TypeScript API for HireFlow. The service uses Prisma with SQLite by de
    AWS_SECRET_ACCESS_KEY=
    ```
 
-3. **Generate Prisma client and create the local DB**
+4. **Generate Prisma client and create the database schema**
    ```bash
    npx prisma db push
    ```
 
-4. **Run the development server**
+5. **Run the development server**
    ```bash
    npm run dev
    ```
    The API listens on `http://localhost:4000` by default. Adjust `PORT` to change the port.
 
-5. **(Optional) Open Prisma Studio** to inspect the database while developing.
+6. **(Optional) Open Prisma Studio** to inspect the database while developing.
    ```bash
    npx prisma studio
    ```
