@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../prismaClient';
 import { ParsedResume } from './aiResumeParser';
-
-const prisma = new PrismaClient();
 
 type ParseStatus = 'SUCCESS' | 'FAILED';
 
