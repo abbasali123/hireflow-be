@@ -1,9 +1,9 @@
-import { Request, Response } from 'express';
-import fs from 'fs/promises';
+import { Request, RequestHandler, Response } from 'express';
 import prisma from '../prismaClient';
-import { extractCandidateData } from '../utils/resumeParser';
-import { isS3Driver } from '../config/storageConfig';
-import { uploadResumeToS3 } from '../utils/storageService';
+import { aiParseResume, ParsedResume } from '../services/aiResumeParser';
+import { createCandidateFromParsedResume } from '../services/candidateService';
+import { normalizeParsedResume } from '../services/resumeNormalizer';
+import { extractTextFromResume } from '../services/resumeTextExtractor';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -14,12 +14,57 @@ interface AuthenticatedRequest extends Request {
 
 type UploadRequest = Request & { file?: Express.Multer.File };
 
+type BasicCandidatePayload = {
+  fullName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  headline?: string | null;
+  resumeUrl?: string | null;
+  rawText?: string | null;
+  skills?: unknown;
+  experience?: unknown;
+  education?: unknown;
+  yearsOfExperience?: number | null;
+  atsScore?: number | null;
+  parseStatus?: string;
+  parseError?: string | null;
+};
+
+const emptyParsedResume = (): ParsedResume => ({
+  fullName: null,
+  email: null,
+  phone: null,
+  location: null,
+  headline: null,
+  atsScore: null,
+  skills: [],
+  experience: [],
+  education: [],
+  yearsOfExperience: null,
+});
+
 export const createCandidate = async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { fullName, email, phone, location, summary, skills, experience, education } = req.body;
+  const {
+    fullName,
+    email,
+    phone,
+    location,
+    headline,
+    skills,
+    experience,
+    education,
+    resumeUrl,
+    rawText,
+    yearsOfExperience,
+    atsScore,
+    parseStatus,
+    parseError,
+  }: BasicCandidatePayload = req.body;
 
   if (!fullName) {
     return res.status(400).json({ error: 'Full name is required' });
@@ -30,13 +75,19 @@ export const createCandidate = async (req: AuthenticatedRequest, res: Response) 
       data: {
         userId: req.user.id,
         fullName,
-        email,
-        phone,
-        location,
-        summary,
-        skills: skills ?? [],
-        experience: experience ?? [],
-        education: education ?? [],
+        email: email ?? null,
+        phone: phone ?? null,
+        location: location ?? null,
+        headline: headline ?? null,
+        resumeUrl: resumeUrl ?? null,
+        rawText: rawText ?? null,
+        skills: (skills as any) ?? [],
+        experience: (experience as any) ?? [],
+        education: (education as any) ?? [],
+        yearsOfExperience: yearsOfExperience ?? null,
+        atsScore: atsScore ?? null,
+        parseStatus: parseStatus ?? undefined,
+        parseError: parseError ?? null,
       },
     });
 
@@ -97,7 +148,22 @@ export const updateCandidate = async (req: AuthenticatedRequest, res: Response) 
   }
 
   const { id } = req.params;
-  const { fullName, email, phone, location, summary, skills, experience, education } = req.body;
+  const {
+    fullName,
+    email,
+    phone,
+    location,
+    headline,
+    skills,
+    experience,
+    education,
+    resumeUrl,
+    rawText,
+    yearsOfExperience,
+    atsScore,
+    parseStatus,
+    parseError,
+  }: BasicCandidatePayload = req.body;
 
   try {
     const existingCandidate = await prisma.candidate.findFirst({
@@ -115,13 +181,19 @@ export const updateCandidate = async (req: AuthenticatedRequest, res: Response) 
       where: { id },
       data: {
         fullName,
-        email,
-        phone,
-        location,
-        summary,
-        skills,
-        experience,
-        education,
+        email: email ?? null,
+        phone: phone ?? null,
+        location: location ?? null,
+        headline: headline ?? null,
+        skills: (skills as any) ?? existingCandidate.skills,
+        experience: (experience as any) ?? existingCandidate.experience,
+        education: (education as any) ?? existingCandidate.education,
+        resumeUrl: resumeUrl ?? existingCandidate.resumeUrl,
+        rawText: rawText ?? existingCandidate.rawText,
+        yearsOfExperience: yearsOfExperience ?? existingCandidate.yearsOfExperience,
+        atsScore: atsScore ?? existingCandidate.atsScore,
+        parseStatus: parseStatus ?? existingCandidate.parseStatus,
+        parseError: parseError ?? existingCandidate.parseError,
       },
     });
 
@@ -160,8 +232,10 @@ export const deleteCandidate = async (req: AuthenticatedRequest, res: Response) 
   }
 };
 
-export const uploadCandidate = async (req: UploadRequest, res: Response) => {
-  if (!req.user) {
+export const uploadResumeHandler: RequestHandler = async (req: UploadRequest, res, next) => {
+  const userId = req.user?.id;
+
+  if (!userId) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -171,35 +245,73 @@ export const uploadCandidate = async (req: UploadRequest, res: Response) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
+  let extractionText = '';
+
   try {
-    const candidateData = await extractCandidateData(file);
+    const extraction = await extractTextFromResume(file);
+    extractionText = extraction.text;
 
-    const candidate = await prisma.candidate.create({
-      data: {
-        userId: req.user.id,
-        fullName: candidateData.fullName,
-        rawText: candidateData.rawText,
-        skills: candidateData.skills,
-        experience: candidateData.experience,
-        education: candidateData.education,
-      },
-    });
+    if (extraction.isScannedLike) {
+      const parseError =
+        'Resume appears to be scanned or contains too little text. Please upload a text-based PDF or DOCX.';
+      const candidate = await createCandidateFromParsedResume(
+        userId,
+        file,
+        extraction.text,
+        emptyParsedResume(),
+        'FAILED',
+        parseError,
+      );
 
-    const s3Upload = await uploadResumeToS3(file);
-
-    const responsePayload = s3Upload ? { ...candidate, resumeLocation: s3Upload.location } : candidate;
-
-    return res.status(201).json(responsePayload);
+      return res.status(422).json({ message: parseError, candidate });
+    }
   } catch (error) {
-    console.error('Error uploading candidate:', error);
-    return res.status(500).json({ error: 'Failed to process resume' });
-  } finally {
-    if (!isS3Driver && file.path) {
-      try {
-        await fs.unlink(file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up uploaded file:', cleanupError);
-      }
+    const message = error instanceof Error ? error.message : 'Could not extract text from resume';
+
+    try {
+      const candidate = await createCandidateFromParsedResume(
+        userId,
+        file,
+        extractionText,
+        emptyParsedResume(),
+        'FAILED',
+        message,
+      );
+
+      return res.status(400).json({ error: message, candidate });
+    } catch (dbError) {
+      return next(dbError);
+    }
+  }
+
+  try {
+    const parsed = await aiParseResume(extractionText);
+    const normalized = normalizeParsedResume(parsed, extractionText);
+    const candidate = await createCandidateFromParsedResume(
+      userId,
+      file,
+      extractionText,
+      normalized,
+      'SUCCESS',
+    );
+
+    return res.status(201).json(candidate);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to parse resume';
+
+    try {
+      const candidate = await createCandidateFromParsedResume(
+        userId,
+        file,
+        extractionText,
+        emptyParsedResume(),
+        'FAILED',
+        message,
+      );
+
+      return res.status(500).json({ error: message, candidate });
+    } catch (dbError) {
+      return next(dbError);
     }
   }
 };

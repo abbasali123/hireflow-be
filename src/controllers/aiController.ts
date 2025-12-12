@@ -50,12 +50,16 @@ const buildCandidatePayload = (candidateInput: any): Candidate | null => {
     phone: candidateInput.phone ?? null,
     location: candidateInput.location ?? null,
     resumeUrl: candidateInput.resumeUrl ?? null,
-    summary: candidateInput.summary ?? null,
+    headline: candidateInput.headline ?? null,
     rawText: candidateInput.rawText ?? null,
     skills: candidateInput.skills ?? [],
     experience: candidateInput.experience ?? [],
     education: candidateInput.education ?? [],
+    yearsOfExperience: candidateInput.yearsOfExperience ?? null,
+    parseStatus: candidateInput.parseStatus ?? 'PENDING',
+    parseError: candidateInput.parseError ?? null,
     createdAt: candidateInput.createdAt ? new Date(candidateInput.createdAt) : new Date(),
+    jobCandidates: candidateInput.jobCandidates ?? [],
   };
 };
 

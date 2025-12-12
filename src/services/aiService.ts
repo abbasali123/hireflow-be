@@ -77,12 +77,13 @@ const buildCandidatePrompt = (candidate: Candidate): string => {
   return [
     `Name: ${candidate.fullName}`,
     `Location: ${candidate.location ?? 'Not specified'}`,
-    `Summary: ${candidate.summary ?? 'Not provided'}`,
+    `Headline: ${candidate.headline ?? 'Not provided'}`,
     `Skills: ${skills}`,
     `Experience: ${experience}`,
     `Education: ${education}`,
     `Email: ${candidate.email ?? 'Not provided'}`,
     `Phone: ${candidate.phone ?? 'Not provided'}`,
+    `Years of Experience: ${candidate.yearsOfExperience ?? 'Not provided'}`,
   ].join('\n');
 };
 
