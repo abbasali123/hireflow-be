@@ -44,6 +44,7 @@ async function main() {
       description: 'Lead backend development for resume intelligence features.',
       requiredSkills: ['Node.js', 'TypeScript', 'PostgreSQL', 'Prisma'],
       niceToHaveSkills: ['AWS', 'Docker', 'Kafka'],
+      status: 'OPEN',
     },
   });
 
@@ -59,6 +60,7 @@ async function main() {
       description: 'Own end-to-end design for recruiter and candidate experiences.',
       requiredSkills: ['Figma', 'User research', 'Design systems'],
       niceToHaveSkills: ['Prototyping', 'HTML/CSS'],
+      status: 'CLOSED',
     },
   });
 
@@ -74,6 +76,7 @@ async function main() {
       description: 'Source and manage candidates for high-growth startups.',
       requiredSkills: ['Sourcing', 'ATS management', 'Technical screening'],
       niceToHaveSkills: ['Salesforce', 'Greenhouse', 'LinkedIn Recruiter'],
+      status: 'OPEN',
     },
   });
 

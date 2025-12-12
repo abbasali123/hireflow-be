@@ -47,6 +47,24 @@ export const createCandidate = async (req: AuthenticatedRequest, res: Response) 
   }
 };
 
+export const getCandidates = async (req: AuthenticatedRequest, res: Response) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const candidates = await prisma.candidate.findMany({
+      where: { userId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json(candidates);
+  } catch (error) {
+    console.error('Error fetching candidates:', error);
+    return res.status(500).json({ error: 'Failed to retrieve candidates' });
+  }
+};
+
 export const getCandidateById = async (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });

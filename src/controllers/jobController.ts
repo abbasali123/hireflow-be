@@ -11,6 +11,24 @@ type JobRequestBody = {
   description?: string;
   requiredSkills?: unknown;
   niceToHaveSkills?: unknown;
+  status?: string;
+};
+
+const JOB_STATUSES = ['OPEN', 'CLOSED'] as const;
+type JobStatus = (typeof JOB_STATUSES)[number];
+
+const normalizeJobStatus = (status?: string): JobStatus => {
+  if (!status) {
+    return 'OPEN';
+  }
+
+  const normalized = status.toUpperCase();
+
+  if (!JOB_STATUSES.includes(normalized as JobStatus)) {
+    throw new Error('Invalid status');
+  }
+
+  return normalized as JobStatus;
 };
 
 export const createJob = async (req: Request, res: Response) => {
@@ -28,10 +46,18 @@ export const createJob = async (req: Request, res: Response) => {
     description,
     requiredSkills,
     niceToHaveSkills,
+    status,
   } = req.body as JobRequestBody;
 
   if (!title || !company || !location || !seniority || !description || !requiredSkills || !niceToHaveSkills) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  let normalizedStatus: JobStatus;
+  try {
+    normalizedStatus = normalizeJobStatus(status);
+  } catch (error) {
+    return res.status(400).json({ error: 'Status must be either OPEN or CLOSED' });
   }
 
   try {
@@ -46,6 +72,7 @@ export const createJob = async (req: Request, res: Response) => {
         description,
         requiredSkills,
         niceToHaveSkills,
+        status: normalizedStatus,
         userId: req.user.id,
       },
     });
@@ -112,6 +139,7 @@ export const updateJob = async (req: Request, res: Response) => {
     description,
     requiredSkills,
     niceToHaveSkills,
+    status,
   } = req.body as JobRequestBody;
 
   try {
@@ -132,6 +160,13 @@ export const updateJob = async (req: Request, res: Response) => {
     if (description !== undefined) data.description = description;
     if (requiredSkills !== undefined) data.requiredSkills = requiredSkills;
     if (niceToHaveSkills !== undefined) data.niceToHaveSkills = niceToHaveSkills;
+    if (status !== undefined) {
+      try {
+        data.status = normalizeJobStatus(status);
+      } catch (error) {
+        return res.status(400).json({ error: 'Status must be either OPEN or CLOSED' });
+      }
+    }
 
     const updatedJob = await prisma.job.update({
       where: { id },

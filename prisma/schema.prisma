@@ -9,6 +9,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum JobStatus {
+  OPEN
+  CLOSED
+}
+
 model User {
   id           String      @id @default(cuid())
   email        String      @unique
@@ -32,6 +37,7 @@ model Job {
   description      String
   requiredSkills   Json
   niceToHaveSkills Json
+  status           JobStatus @default(OPEN)
   createdAt        DateTime       @default(now())
   user             User           @relation(fields: [userId], references: [id])
   jobCandidates    JobCandidate[]
