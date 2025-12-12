@@ -44,21 +44,25 @@ model Job {
 }
 
 model Candidate {
-  id            String         @id @default(cuid())
-  userId        String
-  fullName      String
-  email         String?
-  phone         String?
-  location      String?
-  resumeUrl     String?
-  summary       String?
-  rawText       String?
-  skills        Json
-  experience    Json
-  education     Json
-  createdAt     DateTime       @default(now())
-  user          User           @relation(fields: [userId], references: [id])
-  jobCandidates JobCandidate[]
+  id                String         @id @default(cuid())
+  userId            String
+  fullName          String?
+  email             String?
+  phone             String?
+  location          String?
+  headline          String?
+  resumeUrl         String?
+  rawText           String?
+  skills            Json           @default("[]")
+  experience        Json           @default("[]")
+  education         Json           @default("[]")
+  yearsOfExperience Int?
+  atsScore          Int?
+  parseStatus       String         @default("PENDING")
+  parseError        String?
+  createdAt         DateTime       @default(now())
+  user              User           @relation(fields: [userId], references: [id])
+  jobCandidates     JobCandidate[]
 }
 
 model JobCandidate {
