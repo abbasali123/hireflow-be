@@ -1,5 +1,6 @@
-import { Request, Response } from 'express';
+import { Request, RequestHandler, Response } from 'express';
 import prisma from '../prismaClient';
+import { autoAttachTopCandidatesForJob } from '../services/autoAttachCandidatesService';
 
 type JobRequestBody = {
   title?: string;
@@ -31,7 +32,7 @@ const normalizeJobStatus = (status?: string): JobStatus => {
   return normalized as JobStatus;
 };
 
-export const createJob = async (req: Request, res: Response) => {
+export const createJobHandler: RequestHandler = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -77,6 +78,11 @@ export const createJob = async (req: Request, res: Response) => {
       },
     });
 
+    // Trigger AI matching to auto-populate the pipeline for this job.
+    autoAttachTopCandidatesForJob(req.user.id, job.id).catch((error) => {
+      console.error('Error auto-attaching candidates for job', job.id, error);
+    });
+
     return res.status(201).json(job);
   } catch (error) {
     console.error('Error creating job:', error);
@@ -99,6 +105,27 @@ export const getJobs = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error fetching jobs:', error);
     return res.status(500).json({ error: 'Failed to fetch jobs' });
+  }
+};
+
+export const refreshJobMatchesHandler: RequestHandler = async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { id } = req.params;
+
+  try {
+    await autoAttachTopCandidatesForJob(req.user.id, id, { limit: 20, minScore: 50 });
+    return res.status(200).json({ message: 'AI matches refreshed' });
+  } catch (error) {
+    const status = (error as Error & { status?: number }).status;
+    if (status === 404) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    console.error('Error refreshing job matches:', error);
+    return res.status(500).json({ error: 'Failed to refresh AI matches' });
   }
 };
 
