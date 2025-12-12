@@ -4,7 +4,7 @@ import { aiParseResume, ParsedResume } from '../services/aiResumeParser';
 import { createCandidateFromParsedResume } from '../services/candidateService';
 import { normalizeParsedResume } from '../services/resumeNormalizer';
 import { extractTextFromResume } from '../services/resumeTextExtractor';
-import { extractCandidateData } from '../utils/resumeParser';
+import { CandidateExtraction, extractCandidateData } from '../utils/resumeParser';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -45,30 +45,24 @@ const emptyParsedResume = (): ParsedResume => ({
   yearsOfExperience: null,
 });
 
-const mapFallbackExtractionToParsed = (fallback: ReturnType<typeof emptyParsedResume> & {
-  fullName: string;
-  rawText: string;
-  skills: string[];
-  experience: string[];
-  education: string[];
-}): ParsedResume => ({
-  fullName: fallback.fullName ?? null,
+const mapFallbackExtractionToParsed = (fallback: CandidateExtraction): ParsedResume => ({
+  fullName: fallback.fullName || null,
   email: null,
   phone: null,
   location: null,
   headline: null,
   atsScore: null,
-  skills: fallback.skills,
-  experience: fallback.experience.map((entry) => ({
+  skills: fallback.skills ?? [],
+  experience: (fallback.experience ?? []).map((entry) => ({
     company: null,
     title: null,
     startDate: null,
     endDate: null,
     location: null,
-    description: entry || null,
+    description: entry?.trim() || null,
   })),
-  education: fallback.education.map((entry) => ({
-    institution: entry || null,
+  education: (fallback.education ?? []).map((entry) => ({
+    institution: entry?.trim() || null,
     degree: null,
     fieldOfStudy: null,
     startDate: null,
@@ -334,10 +328,7 @@ export const uploadResumeHandler: RequestHandler = async (req: UploadRequest, re
 
     try {
       const fallbackExtraction = await extractCandidateData(file);
-      const fallbackParsed = mapFallbackExtractionToParsed({
-        ...emptyParsedResume(),
-        ...fallbackExtraction,
-      });
+      const fallbackParsed = mapFallbackExtractionToParsed(fallbackExtraction);
       const normalizedFallback = normalizeParsedResume(fallbackParsed, fallbackExtraction.rawText);
       const candidate = await createCandidateFromParsedResume(
         userId,
