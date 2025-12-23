@@ -4,6 +4,7 @@ import { aiParseResume, ParsedResume } from '../services/aiResumeParser';
 import { createCandidateFromParsedResume } from '../services/candidateService';
 import { normalizeParsedResume } from '../services/resumeNormalizer';
 import { extractTextFromResume } from '../services/resumeTextExtractor';
+import { CandidateExtraction, extractCandidateData } from '../utils/resumeParser';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -32,16 +33,42 @@ type BasicCandidatePayload = {
 };
 
 const emptyParsedResume = (): ParsedResume => ({
-  fullName: null,
-  email: null,
-  phone: null,
-  location: null,
-  headline: null,
+  fullName: '',
+  email: '',
+  phone: '',
+  location: '',
+  headline: '',
   atsScore: null,
   skills: [],
   experience: [],
   education: [],
-  yearsOfExperience: null,
+  yearsOfExperience: 0,
+});
+
+const mapFallbackExtractionToParsed = (fallback: CandidateExtraction): ParsedResume => ({
+  fullName: fallback.fullName || null,
+  email: '',
+  phone: '',
+  location: '',
+  headline: '',
+  atsScore: null,
+  skills: fallback.skills ?? [],
+  experience: (fallback.experience ?? []).map((entry) => ({
+    company: '',
+    title: '',
+    startDate: '',
+    endDate: '',
+    location: '',
+    description: entry?.trim() || '',
+  })),
+  education: (fallback.education ?? []).map((entry) => ({
+    institution: entry?.trim() || '',
+    degree: '',
+    fieldOfStudy: '',
+    startDate: '',
+    endDate: '',
+  })),
+  yearsOfExperience: 0,
 });
 
 export const createCandidate = async (req: AuthenticatedRequest, res: Response) => {
@@ -300,18 +327,40 @@ export const uploadResumeHandler: RequestHandler = async (req: UploadRequest, re
     const message = error instanceof Error ? error.message : 'Failed to parse resume';
 
     try {
+      const fallbackExtraction = await extractCandidateData(file);
+      const fallbackParsed = mapFallbackExtractionToParsed(fallbackExtraction);
+      const normalizedFallback = normalizeParsedResume(fallbackParsed, fallbackExtraction.rawText);
       const candidate = await createCandidateFromParsedResume(
         userId,
         file,
-        extractionText,
-        emptyParsedResume(),
+        fallbackExtraction.rawText,
+        normalizedFallback,
         'FAILED',
         message,
       );
 
-      return res.status(500).json({ error: message, candidate });
-    } catch (dbError) {
-      return next(dbError);
+      return res.status(201).json({
+        message: 'AI parsing failed; saved fallback extraction instead.',
+        candidate,
+      });
+    } catch (fallbackError) {
+      const fallbackMessage =
+        fallbackError instanceof Error ? fallbackError.message : 'Failed to process resume';
+
+      try {
+        const candidate = await createCandidateFromParsedResume(
+          userId,
+          file,
+          extractionText,
+          emptyParsedResume(),
+          'FAILED',
+          `${message}; fallback also failed: ${fallbackMessage}`,
+        );
+
+        return res.status(500).json({ error: message, candidate });
+      } catch (dbError) {
+        return next(dbError);
+      }
     }
   }
 };
